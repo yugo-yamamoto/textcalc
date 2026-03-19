@@ -5,6 +5,38 @@ import tkinter as tk
 from tkinter import ttk
 from tkinter import font as tkfont
 from decimal import Decimal, InvalidOperation
+from ctypes import wintypes
+
+# --- IME フォント設定 ---
+
+class LOGFONT(ctypes.Structure):
+    _fields_ = [
+        ("lfHeight",         wintypes.LONG),
+        ("lfWidth",          wintypes.LONG),
+        ("lfEscapement",     wintypes.LONG),
+        ("lfOrientation",    wintypes.LONG),
+        ("lfWeight",         wintypes.LONG),
+        ("lfItalic",         ctypes.c_byte),
+        ("lfUnderline",      ctypes.c_byte),
+        ("lfStrikeOut",      ctypes.c_byte),
+        ("lfCharSet",        ctypes.c_byte),
+        ("lfOutPrecision",   ctypes.c_byte),
+        ("lfClipPrecision",  ctypes.c_byte),
+        ("lfQuality",        ctypes.c_byte),
+        ("lfPitchAndFamily", ctypes.c_byte),
+        ("lfFaceName",       ctypes.c_wchar * 32),
+    ]
+
+def set_ime_composition_font(hwnd: int, face: str, size_pt: float, dpi_scale: float) -> None:
+    """IME 候補ウィンドウのフォントを Entry と同じサイズに設定する。"""
+    lf = LOGFONT()
+    lf.lfHeight    = -round(size_pt * dpi_scale * 96 / 72)  # pt → 負のピクセル高
+    lf.lfCharSet   = 128   # SHIFTJIS_CHARSET
+    lf.lfFaceName  = face
+    himc = ctypes.windll.imm32.ImmGetContext(hwnd)
+    if himc:
+        ctypes.windll.imm32.ImmSetCompositionFontW(himc, ctypes.byref(lf))
+        ctypes.windll.imm32.ImmReleaseContext(hwnd, himc)
 
 # --- DPI 対応 ---
 try:
@@ -129,6 +161,11 @@ def main():
     entry_var = tk.StringVar(value=first_line)
     entry = ttk.Entry(frame, textvariable=entry_var, font=app_font)
     entry.pack(fill="x", expand=False, pady=(0, 8))
+
+    def on_entry_focus_in(event):
+        set_ime_composition_font(entry.winfo_id(), "Meiryo", base_font_size, dpi_scale)
+
+    entry.bind("<FocusIn>", on_entry_focus_in)
 
     btn_frame = ttk.Frame(frame)
     btn_frame.pack(fill="x", pady=(4, 0))
